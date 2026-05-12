@@ -49,6 +49,13 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
 
+    # Normalize the Standard column: strip whitespace so hierarchy checks
+    # (is_leaf / parent) compare clean values like "1.1.1", not "1.1.1 ".
+    if "Standard" in df.columns:
+        df["Standard"] = df["Standard"].apply(
+            lambda v: str(v).strip() if pd.notna(v) else v
+        )
+
     # 0. Missing required column values
     for col in REQUIRED_COLS:
         if col not in df.columns:
