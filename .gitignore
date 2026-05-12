@@ -1,0 +1,19 @@
+# Virtual environments
+myenv/
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local data / output
+validation_errors.xlsx
+*.xlsx
+*.xls
