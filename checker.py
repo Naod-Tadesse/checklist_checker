@@ -61,7 +61,7 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             errors.append({
                 "Standard": "N/A",
-                "Error": f"Missing column: '{col}'"
+                "Error": f"The file is missing a required column called '{col}'."
             })
             continue
 
@@ -69,7 +69,7 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
         for _, r in missing_rows.iterrows():
             errors.append({
                 "Standard": r.get("Standard", "N/A"),
-                "Error": f"Missing value in column '{col}'"
+                "Error": f"This row has no value in the '{col}' column — please fill it in."
             })
 
     # Stop further processing if key columns missing
@@ -93,7 +93,8 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
         if not STANDARD_PATTERN.match(val):
             errors.append({
                 "Standard": row["Standard"],
-                "Error": "Invalid Standard format"
+                "Error": f"'{val}' is not a valid item number. It should contain only "
+                         f"numbers and dots, like 1, 1.2, or 1.2.3."
             })
 
     # 2. Global consistency check (case-sensitive)
@@ -107,7 +108,8 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
                 if pd.isna(row[col]) or cell_value != expected_value:
                     errors.append({
                         "Standard": row["Standard"],
-                        "Error": f"Inconsistent value in '{col}'. Expected '{expected_value}', found '{row[col]}'"
+                        "Error": f"The '{col}' column should be the same in every row. "
+                                 f"Most rows have '{expected_value}', but this row has '{row[col]}'."
                     })
 
     # 3. Leaf standards must not have weight
@@ -115,7 +117,8 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
         if is_leaf(row["Standard"]) and pd.notna(row.get("Weight (Percentage)", None)):
             errors.append({
                 "Standard": row["Standard"],
-                "Error": "Leaf standard should not have Weight (%)"
+                "Error": "This is a lowest-level item (it has no sub-items), so it should "
+                         "not have a weight percentage."
             })
 
     # 4. Non-leaf standards must have weight
@@ -125,7 +128,8 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
             if weight_num is None:
                 errors.append({
                     "Standard": row["Standard"],
-                    "Error": "Non-leaf standard must have a valid percentage weight"
+                    "Error": "This item has sub-items, so it must have a valid weight "
+                             "percentage (for example, 25%)."
                 })
 
     # 5. Weight sum = 100% per parent
@@ -143,7 +147,37 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
             for _, r in bad_rows.iterrows():
                 errors.append({
                     "Standard": r["Standard"],
-                    "Error": f"Weight sum under parent '{parent}' is {total:.2f}% (must be 100%)"
+                    "Error": f"The weights of all items under '{parent}' should add up to "
+                             f"100%, but they currently total {total:.2f}%."
                 })
+
+    # 6. Sibling order check: within each parent, the final segment of the
+    #    children must run sequentially 1, 2, 3, ... in document order with no
+    #    gaps, duplicates, or reordering.
+    #    e.g. 10.1 -> 10.2 -> 10.3 -> 10.4 is correct;
+    #         10.1 -> 10.4 is incorrect (10.2 and 10.3 are skipped).
+    next_expected = {}  # parent string -> next expected final segment
+    for _, row in df.iterrows():
+        val = str(row["Standard"]).strip()
+        if not STANDARD_PATTERN.match(val):
+            continue  # malformed standards are already flagged by check #1
+
+        parts = val.split(".")
+        last = int(parts[-1])
+        parent = ".".join(parts[:-1])  # "" for top-level standards
+        expected = next_expected.get(parent, 1)
+
+        if last != expected:
+            prefix = f"{parent}." if parent else ""
+            errors.append({
+                "Standard": row["Standard"],
+                "Error": f"This item is out of order. The next item here should be "
+                         f"'{prefix}{expected}', but found '{val}'. Items must be listed "
+                         f"in counting order ({prefix}1, then {prefix}2, then {prefix}3, ...)."
+            })
+
+        # Advance from the value actually seen so a single gap doesn't
+        # cascade into flagging every following sibling.
+        next_expected[parent] = last + 1
 
     return pd.DataFrame(errors).drop_duplicates(subset=["Standard", "Error"])

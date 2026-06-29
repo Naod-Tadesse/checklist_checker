@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 from checker import validate_checklist
 
 st.set_page_config(page_title="Checklist Validator", layout="wide")
@@ -30,9 +31,12 @@ if uploaded_file:
                 st.write("### Standards with Errors")
                 st.dataframe(error_df, width=1200, height=600)
 
+                buffer = BytesIO()
+                error_df.to_excel(buffer, index=False)
+
                 st.download_button(
                     "⬇️ Download Error Report",
-                    data=error_df.to_excel(index=False),
+                    data=buffer.getvalue(),
                     file_name="validation_errors.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
