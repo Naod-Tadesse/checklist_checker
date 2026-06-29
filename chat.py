@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-from checker import validate_checklist
+from checker import validate_checklist, read_checklist
 
 st.set_page_config(page_title="Checklist Validator", layout="wide")
 
@@ -15,7 +15,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file:
     try:
-        df = pd.read_excel(uploaded_file)
+        df = read_checklist(uploaded_file)
 
         st.success("File uploaded successfully")
         st.write("### Data Preview")
@@ -29,7 +29,7 @@ if uploaded_file:
             else:
                 st.error(f"❌ {len(error_df)} issues found")
                 st.write("### Standards with Errors")
-                st.dataframe(error_df, width=1200, height=600)
+                st.dataframe(error_df, width=1200, height=600, hide_index=True)
 
                 buffer = BytesIO()
                 error_df.to_excel(buffer, index=False)
