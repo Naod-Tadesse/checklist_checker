@@ -169,7 +169,12 @@ def validate_checklist(df: pd.DataFrame) -> pd.DataFrame:
         return _finalize(errors)
 
     # Helper functions
-    all_standards = df["Standard"].astype(str).tolist()
+    # Blank cells are dropped: pandas keeps them as NaN through astype(str),
+    # and an empty Standard can never be another item's parent anyway. The
+    # missing value itself is already reported by check #0.
+    all_standards = [
+        str(v).strip() for v in df["Standard"].tolist() if pd.notna(v)
+    ]
 
     def is_leaf(s):
         s = str(s)
